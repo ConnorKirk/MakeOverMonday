@@ -1,0 +1,103 @@
+---
+title: "Exploratory Analysis"
+output: html_notebook
+---
+
+
+
+# Initial Thoughts
+
+The original article has a strong narrative and contains lots of hard data. It compares the top 50 highest paying jobs between gender in Australia, and aims to highlight the disparity between genders.
+
+* It has many numbers, but I feel visualisations of the data may have helped convey the size of the difference, as well as more easily summarising the differences across many job roles.
+
+
+# Potential Paths
+
+* What are the job roles with the biggest disparities?
+* Are there any jobs where women earn more?
+  * If so, how many?
+* Are there any jobs with roughly equal levels of pay (~ 10 %)
+* Produce a visualisation showing the top 10 paying job roles, and the scale of the disparity between genders.
+
+
+# Analysis
+
+## Load Data
+
+```{r}
+
+library(readr)
+library(dplyr)
+
+jobs <- read_csv("Data/AustralianTaxableIncome.csv")
+
+
+summary(jobs)
+summary(jobs$X6)
+
+
+tidy_jobs <- jobs %>%
+            select(GenderRank = 1,
+                   2:4,
+                   AvgTaxIncome = 5)
+                   
+```
+## Are there any jobs where women earn more?
+
+```{r}
+library(tidyr)
+library(knitr)
+
+Female_jobs <-tidy_jobs %>%
+  filter(Gender == "Female")
+
+Male_jobs <- tidy_jobs %>%
+  filter(Gender == "Male")
+
+wide_jobs <- inner_join(Female_jobs, Male_jobs, by = "Occupation", suffix = c("F", "M"))
+
+  
+HigherPayingFJobs <- wide_jobs %>%
+  filter(AvgTaxIncomeF > AvgTaxIncomeM) %>%
+  mutate(Difference = AvgTaxIncomeF - AvgTaxIncomeM) %>%
+  arrange(desc(Difference))
+
+kable(HigherPayingFJobs)
+
+nOfFJobs <- count(HigherPayingFJobs) # Number of Jobs where women earn more
+nOfJobs <- count(wide_jobs) # Number of Jobs where we have salary information for both genders.
+
+
+
+nOfFJobs/nOfJobs * 100
+
+
+
+```
+There are `r nOfFJobs[[1]]` occupations where women earn more than men, of a total `r nOfJobs[[1]]` where we have records for both genders.
+
+By using an inner join, we've excluded jobs where we have no records for just one gender.
+* How many occupations have records for only one gender?
+* Of there, what is the balance?
+* Showing the difference is useful, but the difference as a percentage of the mean wage may be more insightful
+* Produce a plot to show the difference between jobs?
+
+
+
+## Job roles with the biggest disparities
+
+```{r}
+library(ggplot2)
+str(wide_jobs)
+wide_jobs %>%
+  mutate(difference = AvgTaxIncomeM - AvgTaxIncomeF) %>%
+  top_n(n = 10) %>%
+  select(Occupation, AvgTaxIncomeF, AvgTaxIncomeM) %>%
+  gather(key = gender, value = AvgTaxIncome, 2:3) %>%
+  ggplot(aes(Occupation, AvgTaxIncome, fill = gender)) + 
+    geom_bar(stat = "identity", position = "dodge") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    scale_y_continuous(labels = scales::dollar)
+
+```  
